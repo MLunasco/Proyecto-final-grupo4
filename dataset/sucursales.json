@@ -1,0 +1,37 @@
+{
+	"name": "sucursales",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "Cod_Sucursal",
+				"type": "varchar"
+			},
+			{
+				"name": "Cod_Sucursal_PK",
+				"type": "varchar"
+			},
+			{
+				"name": "Sucursal",
+				"type": "varchar"
+			},
+			{
+				"name": "Latitud",
+				"type": "varchar"
+			},
+			{
+				"name": "Longitud",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Sucursales"
+		}
+	}
+}

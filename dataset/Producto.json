@@ -1,0 +1,33 @@
+{
+	"name": "Producto",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "Cod_Producto",
+				"type": "varchar"
+			},
+			{
+				"name": "Producto",
+				"type": "varchar"
+			},
+			{
+				"name": "Cod_SubCategoria",
+				"type": "varchar"
+			},
+			{
+				"name": "Color",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Producto"
+		}
+	}
+}
