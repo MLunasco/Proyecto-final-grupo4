@@ -6,7 +6,7 @@
 		"type": "AzureSqlDatabase",
 		"typeProperties": {
 			"connectionString": "integrated security=False;encrypt=True;connection timeout=30;data source=sqlsiglo21.database.windows.net;initial catalog=db_demo;user id=server",
-			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQDU5MkE5OEYzLTVGQkQtNDAyQy04QkY2LTQ3NDdCODQzMzk3OF84YzQ0OWRkZi1kMzdhLTQyYmUtOTA4Yy05NWY2OGI2MmYyMDgiDQp9"
+			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQDU5MkE5OEYzLTVGQkQtNDAyQy04QkY2LTQ3NDdCODQzMzk3OF84MjI0ZWNiMy0yZWRhLTQ4MDUtOGM4Ny1jYzdiYmU2YjEwZjYiDQp9"
 		}
 	}
 }
