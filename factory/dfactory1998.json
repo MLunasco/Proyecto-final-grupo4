@@ -1,0 +1,9 @@
+{
+	"name": "dfactory1998",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "7be6fe8a-5874-46a6-ab4c-07468b3ae75e",
+		"tenantId": "a6fe1b1e-97b7-422d-b1bc-e37254398663"
+	}
+}
