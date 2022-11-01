@@ -2,24 +2,31 @@
 	"name": "Categoria",
 	"properties": {
 		"linkedServiceName": {
-			"referenceName": "AzureSqlDatabase1",
+			"referenceName": "AzureBlobStorage1",
 			"type": "LinkedServiceReference"
 		},
 		"annotations": [],
-		"type": "AzureSqlTable",
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": "Categoria.csv",
+				"container": "container1"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
 		"schema": [
 			{
 				"name": "Cod_Categoria",
-				"type": "varchar"
+				"type": "String"
 			},
 			{
 				"name": "Categoria",
-				"type": "varchar"
+				"type": "String"
 			}
-		],
-		"typeProperties": {
-			"schema": "dbo",
-			"table": "Categoria"
-		}
+		]
 	}
 }
