@@ -1,0 +1,1521 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "factorygrupo4"
+		},
+		"AzureSqlDatabase1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureSqlDatabase1'"
+		},
+		"AzureBlobStorage1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureBlobStorage1'"
+		},
+		"dataLake_dataFactory_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'dataLake_dataFactory'"
+		},
+		"AzureDatabricks1_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'AzureDatabricks1'"
+		},
+		"AzureDataLakeStorage1_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'AzureDataLakeStorage1'"
+		},
+		"dataLake_dataFactory_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://datalakegrupo4.dfs.core.windows.net/"
+		},
+		"AzureDatabricks1_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "1026-135537-2z577k6j"
+		},
+		"AzureDataLakeStorage1_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://datalake01atencio.dfs.core.windows.net/"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/dbToCSV')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "List Table",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT * FROM dbRetail.INFORMATION_SCHEMA.TABLES where table_type = 'BASE TABLE'",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DataSetTable",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "ForEachTable",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "List Table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('List Table').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "Export Table",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "SQLTable",
+											"type": "DatasetReference",
+											"parameters": {
+												"TableName": {
+													"value": "@item().table_name",
+													"type": "Expression"
+												},
+												"SchemaName": {
+													"value": "@item().table_schema",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CSVTable",
+											"type": "DatasetReference",
+											"parameters": {
+												"FilaName": {
+													"value": "@concat(item().table_schema,'_',item().table_name,'.csv')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-02T18:15:01Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DataSetTable')]",
+				"[concat(variables('factoryId'), '/datasets/SQLTable')]",
+				"[concat(variables('factoryId'), '/datasets/CSVTable')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ETL-databricks')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Notebook1",
+						"type": "DatabricksNotebook",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/Users/espinola.marcos98@21.edu.ar/Transformacion 1"
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureDatabricks1",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-02T18:15:01Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ETL-pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Dataflow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "dataflow1",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"source1": {},
+									"source2": {},
+									"source3": {},
+									"source4": {},
+									"source5": {},
+									"source6": {},
+									"source7": {},
+									"source8": {},
+									"sink1": {},
+									"sink2": {},
+									"sink8": {},
+									"sink3": {},
+									"sink4": {},
+									"sink5": {},
+									"sink6": {},
+									"sink7": {},
+									"sink9": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-02T18:15:02Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/dataflow1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureSqlDatabase1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureSqlDatabase1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureBlobStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureBlobStorage1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dataLake_dataFactory')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('dataLake_dataFactory_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('dataLake_dataFactory_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-2677966901592233.13.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDatabricks1_accessToken')]"
+					},
+					"existingClusterId": "[parameters('AzureDatabricks1_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDataLakeStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('AzureDataLakeStorage1_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDataLakeStorage1_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dataflow1')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "Categoria",
+								"type": "DatasetReference"
+							},
+							"name": "source1",
+							"description": "prueda de config de github 2"
+						},
+						{
+							"dataset": {
+								"referenceName": "FactMine",
+								"type": "DatasetReference"
+							},
+							"name": "source2",
+							"description": "Importa la tabla FactMine"
+						},
+						{
+							"dataset": {
+								"referenceName": "Mine",
+								"type": "DatasetReference"
+							},
+							"name": "source3",
+							"description": "importa la tabla Mine"
+						},
+						{
+							"dataset": {
+								"referenceName": "Mine",
+								"type": "DatasetReference"
+							},
+							"name": "source4",
+							"description": "importa la tabla Mine"
+						},
+						{
+							"dataset": {
+								"referenceName": "Producto",
+								"type": "DatasetReference"
+							},
+							"name": "source5",
+							"description": "importa la tabla Producto"
+						},
+						{
+							"dataset": {
+								"referenceName": "Producto",
+								"type": "DatasetReference"
+							},
+							"name": "source6",
+							"description": "importa la tabla Producto"
+						},
+						{
+							"dataset": {
+								"referenceName": "SubCategoria",
+								"type": "DatasetReference"
+							},
+							"name": "source7",
+							"description": "Importa tabla SubCategoria"
+						},
+						{
+							"dataset": {
+								"referenceName": "VentasInternet",
+								"type": "DatasetReference"
+							},
+							"name": "source8",
+							"description": "Importa la tabla VentasInternet"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "transformation1",
+								"type": "DatasetReference"
+							},
+							"name": "sink1",
+							"description": "guarda la informacion en transformation1.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation2",
+								"type": "DatasetReference"
+							},
+							"name": "sink2",
+							"description": "guarda el total en transformation2.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation8",
+								"type": "DatasetReference"
+							},
+							"name": "sink8",
+							"description": "guarda la tabla en transformation8.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation3",
+								"type": "DatasetReference"
+							},
+							"name": "sink3",
+							"description": "guarda las columnas en transformation3.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation4",
+								"type": "DatasetReference"
+							},
+							"name": "sink4",
+							"description": "guarda las columnas en transformation4.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation5",
+								"type": "DatasetReference"
+							},
+							"name": "sink5",
+							"description": "guarda la cantidad de productos en transformation5.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation6",
+								"type": "DatasetReference"
+							},
+							"name": "sink6",
+							"description": "guarda la tabla en transformation6.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation7",
+								"type": "DatasetReference"
+							},
+							"name": "sink7",
+							"description": "guarda la tabla transformation7.csv"
+						},
+						{
+							"dataset": {
+								"referenceName": "transformation9",
+								"type": "DatasetReference"
+							},
+							"name": "sink9",
+							"description": "guarda la tabla en transformation9.csv"
+						}
+					],
+					"transformations": [
+						{
+							"name": "NombreCategorias",
+							"description": "cambia el nombre de la Columna 'Categoria' a 'Nombre_Categoria'\ntambien selecciona esa columna sola"
+						},
+						{
+							"name": "SeleccionMine",
+							"description": "selecciona columnas: Country, FirstName, LastName y Age.\n"
+						},
+						{
+							"name": "TotalOreMined",
+							"description": "selecciona solo la columna TotalOreMined"
+						},
+						{
+							"name": "TotalTotalOreMined",
+							"description": "usa la funcion agregada sum(TotalOreMined) para obtener el total"
+						},
+						{
+							"name": "seleccioncolumnas",
+							"description": "selecciona las columnas 'Country, TotalWasted'"
+						},
+						{
+							"name": "TotalByCountry",
+							"description": "Agrupa por  'Country' y agrega la columna 'TotaltotalWasted'"
+						},
+						{
+							"name": "codproducto",
+							"description": "selecciona solo la columna 'Cod_Producto'"
+						},
+						{
+							"name": "cantproductos",
+							"description": "cuenta la cantidad de productos con count(Cod_Producto)"
+						},
+						{
+							"name": "OrdenadoxCodProd",
+							"description": "ordena por la columna Cod_Producto de forma descendente"
+						},
+						{
+							"name": "CodCategoria3",
+							"description": "filtra las categorias con\n Cod_Categoria == '3'"
+						},
+						{
+							"name": "IngresosNetos",
+							"description": "agrega (toFloat(Cantidad) * toFloat(PrecioUnitario)) - toFloat(CostoUnitario)"
+						},
+						{
+							"name": "seleccioncolumnas2",
+							"description": "Selecciona solo las columnas  'Cod_Producto, Cantidad, PrecioUnitario, CostoUnitario'"
+						},
+						{
+							"name": "seleccioncolumnas3",
+							"description": "'Cod_Producto, Ingresos Netos'"
+						},
+						{
+							"name": "sumaypromedio",
+							"description": "agrupa por 'Cod_Producto' y genera 'Promedio, Suma'"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          Cod_Categoria as string,",
+						"          Categoria as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source1",
+						"source(output(",
+						"          TruckID as integer,",
+						"          ProjectID as integer,",
+						"          OperatorID as integer,",
+						"          TotalOreMined as decimal(19,4),",
+						"          TotalWasted as decimal(19,4),",
+						"          Date as timestamp",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source2",
+						"source(output(",
+						"          TruckID as integer,",
+						"          Truck as string,",
+						"          ProjectID as integer,",
+						"          Country as string,",
+						"          OperatorID as integer,",
+						"          FirstName as string,",
+						"          LastName as string,",
+						"          Age as integer,",
+						"          TotalOreMined as decimal(19,4),",
+						"          TotalWasted as decimal(19,4),",
+						"          Date as timestamp",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source3",
+						"source(output(",
+						"          TruckID as integer,",
+						"          Truck as string,",
+						"          ProjectID as integer,",
+						"          Country as string,",
+						"          OperatorID as integer,",
+						"          FirstName as string,",
+						"          LastName as string,",
+						"          Age as integer,",
+						"          TotalOreMined as decimal(19,4),",
+						"          TotalWasted as decimal(19,4),",
+						"          Date as timestamp",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source4",
+						"source(output(",
+						"          Cod_Producto as string,",
+						"          Producto as string,",
+						"          Cod_SubCategoria as string,",
+						"          Color as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source5",
+						"source(output(",
+						"          Cod_Producto as string,",
+						"          Producto as string,",
+						"          Cod_SubCategoria as string,",
+						"          Color as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source6",
+						"source(output(",
+						"          Cod_SubCategoria as string,",
+						"          SubCategoria as string,",
+						"          Cod_Categoria as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source7",
+						"source(output(",
+						"          Cod_Producto as string,",
+						"          Cod_Cliente as string,",
+						"          Cod_Territorio as string,",
+						"          NumeroOrden as string,",
+						"          Cantidad as string,",
+						"          PrecioUnitario as string,",
+						"          CostoUnitario as string,",
+						"          Impuesto as string,",
+						"          Flete as string,",
+						"          FechaOrden as string,",
+						"          FechaEnvio as string,",
+						"          FechaVencimiento as string,",
+						"          Cod_Promocion as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> source8",
+						"source1 select(mapColumn(",
+						"          Cod_Categoria,",
+						"          Nombre_Categoria = Categoria",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> NombreCategorias",
+						"source3 select(mapColumn(",
+						"          Country,",
+						"          FirstName,",
+						"          LastName,",
+						"          Age",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> SeleccionMine",
+						"source2 select(mapColumn(",
+						"          TotalOreMined",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> TotalOreMined",
+						"TotalOreMined aggregate(Total = sum(TotalOreMined)) ~> TotalTotalOreMined",
+						"source4 select(mapColumn(",
+						"          Country,",
+						"          TotalWasted",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> seleccioncolumnas",
+						"seleccioncolumnas aggregate(groupBy(Country),",
+						"     TotaltotalWasted = sum(TotalWasted)) ~> TotalByCountry",
+						"source5 select(mapColumn(",
+						"          Cod_Producto",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> codproducto",
+						"codproducto aggregate(CantProductos = count(Cod_Producto)) ~> cantproductos",
+						"source6 sort(desc(Cod_Producto, true)) ~> OrdenadoxCodProd",
+						"source7 filter(Cod_Categoria == '3') ~> CodCategoria3",
+						"seleccioncolumnas2 derive({Ingresos Netos} = ( toFloat(Cantidad) * toFloat(PrecioUnitario) ) - toFloat(CostoUnitario)) ~> IngresosNetos",
+						"source8 select(mapColumn(",
+						"          Cod_Producto,",
+						"          Cantidad,",
+						"          PrecioUnitario,",
+						"          CostoUnitario",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> seleccioncolumnas2",
+						"IngresosNetos select(mapColumn(",
+						"          Cod_Producto,",
+						"          {Ingresos Netos}",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> seleccioncolumnas3",
+						"seleccioncolumnas3 aggregate(groupBy(Cod_Producto),",
+						"     Promedio = avg({Ingresos Netos}),",
+						"          Suma = sum({Ingresos Netos})) ~> sumaypromedio",
+						"NombreCategorias sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          Cod_Categoria as string,",
+						"          Nombre_Categoria as string",
+						"     ),",
+						"     partitionFileNames:['transformation1.csv'],",
+						"     truncate: true,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink1",
+						"TotalTotalOreMined sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation2.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink2",
+						"IngresosNetos sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation8.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink8",
+						"SeleccionMine sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation3.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink3",
+						"TotalByCountry sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation4.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink4",
+						"cantproductos sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation5.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink5",
+						"OrdenadoxCodProd sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation6.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink6",
+						"CodCategoria3 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation7.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink7",
+						"sumaypromedio sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     partitionFileNames:['transformation9.csv'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> sink9"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Categoria')]",
+				"[concat(variables('factoryId'), '/datasets/FactMine')]",
+				"[concat(variables('factoryId'), '/datasets/Mine')]",
+				"[concat(variables('factoryId'), '/datasets/Producto')]",
+				"[concat(variables('factoryId'), '/datasets/SubCategoria')]",
+				"[concat(variables('factoryId'), '/datasets/VentasInternet')]",
+				"[concat(variables('factoryId'), '/datasets/transformation1')]",
+				"[concat(variables('factoryId'), '/datasets/transformation2')]",
+				"[concat(variables('factoryId'), '/datasets/transformation8')]",
+				"[concat(variables('factoryId'), '/datasets/transformation3')]",
+				"[concat(variables('factoryId'), '/datasets/transformation4')]",
+				"[concat(variables('factoryId'), '/datasets/transformation5')]",
+				"[concat(variables('factoryId'), '/datasets/transformation6')]",
+				"[concat(variables('factoryId'), '/datasets/transformation7')]",
+				"[concat(variables('factoryId'), '/datasets/transformation9')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CSVTable')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureBlobStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FilaName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().FilaName",
+							"type": "Expression"
+						},
+						"container": "input"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SQLTable')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"TableName": {
+						"type": "string"
+					},
+					"SchemaName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().SchemaName",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().TableName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DataSetTable')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/sucursales')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Cod_Sucursal",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_Sucursal_PK",
+						"type": "varchar"
+					},
+					{
+						"name": "Sucursal",
+						"type": "varchar"
+					},
+					{
+						"name": "Latitud",
+						"type": "varchar"
+					},
+					{
+						"name": "Longitud",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "Sucursales"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SubCategoria')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Cod_SubCategoria",
+						"type": "varchar"
+					},
+					{
+						"name": "SubCategoria",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_Categoria",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "SubCategoria"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Mine')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "TruckID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "Truck",
+						"type": "varchar"
+					},
+					{
+						"name": "ProjectID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "Country",
+						"type": "nvarchar"
+					},
+					{
+						"name": "OperatorID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "FirstName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "LastName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Age",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "TotalOreMined",
+						"type": "money",
+						"precision": 19,
+						"scale": 4
+					},
+					{
+						"name": "TotalWasted",
+						"type": "money",
+						"precision": 19,
+						"scale": 4
+					},
+					{
+						"name": "Date",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "Mine"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Producto')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Cod_Producto",
+						"type": "varchar"
+					},
+					{
+						"name": "Producto",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_SubCategoria",
+						"type": "varchar"
+					},
+					{
+						"name": "Color",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "Producto"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/VentasInternet')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Cod_Producto",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_Cliente",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_Territorio",
+						"type": "varchar"
+					},
+					{
+						"name": "NumeroOrden",
+						"type": "varchar"
+					},
+					{
+						"name": "Cantidad",
+						"type": "varchar"
+					},
+					{
+						"name": "PrecioUnitario",
+						"type": "varchar"
+					},
+					{
+						"name": "CostoUnitario",
+						"type": "varchar"
+					},
+					{
+						"name": "Impuesto",
+						"type": "varchar"
+					},
+					{
+						"name": "Flete",
+						"type": "varchar"
+					},
+					{
+						"name": "FechaOrden",
+						"type": "varchar"
+					},
+					{
+						"name": "FechaEnvio",
+						"type": "varchar"
+					},
+					{
+						"name": "FechaVencimiento",
+						"type": "varchar"
+					},
+					{
+						"name": "Cod_Promocion",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "VentasInternet"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Categoria')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "Cod_Categoria",
+						"type": "varchar"
+					},
+					{
+						"name": "Categoria",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "Categoria"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/FactMine')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "TruckID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "ProjectID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "OperatorID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "TotalOreMined",
+						"type": "money",
+						"precision": 19,
+						"scale": 4
+					},
+					{
+						"name": "TotalWasted",
+						"type": "money",
+						"precision": 19,
+						"scale": 4
+					},
+					{
+						"name": "Date",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "FactMine"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation2')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation1')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "Cod_Categoria",
+						"type": "String"
+					},
+					{
+						"name": "Nombre_Categoria",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation8')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation9')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation7')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation6')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation5')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation3')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/transformation4')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "container123"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage1')]"
+			]
+		}
+	]
+}
